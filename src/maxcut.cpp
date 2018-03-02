@@ -38,7 +38,10 @@ void maxcutGetFinalString(std::string& graphFilePath, int p,std::vector<std::pai
     ExtraData e(p,graphFilePath.c_str());
     e.outputFile = outfilePath;
 
-
+    /*TIP
+    This is a Modern C++ lambda.
+    [closure](args){body}
+    */
     auto calculateFinalString = [&z, &contractionSequence](const std::vector<double>& betas_gammas, ExtraData * f_data) {
         //data
         srand(time(NULL));
@@ -225,6 +228,10 @@ void maxcutGetOptimalAngles(std::string& graphFilePath, int p, const std::string
 
 //command line arguments: <GraphFile Path> <p value> <0 for getAngles, 1 for final cut> <file path to either input angle file (if 1) or output angle file (if 0)> <seconds to preprocess for>
 int main(int argc, char *argv[]) {
+
+    /*TIP
+    Read in parameters
+    */
     if(argc<5)
     {
         std::cout<<"Not enough arguments"<<std::endl;
@@ -255,6 +262,9 @@ int main(int argc, char *argv[]) {
 
     //this part finds the opt string from gammas and betas
 
+    /*TIP
+    Find max cut if given angles.
+    */
     if(anglesOrFinalCut==1) {
         std::ifstream inAngles(argv[4]);
         std::string outfilePath(argv[5]);
@@ -284,17 +294,27 @@ int main(int argc, char *argv[]) {
             return -1;
         }
     }
+    /*TIP
+    Just get angles.
+    */
     else if(anglesOrFinalCut==0)
     {
         std::string outputPath(argv[4]);
         maxcutGetOptimalAngles(graphFilePath, pVal,outputPath);
     }
+    /*TIP
+    Do both angles and solution.
+    */
     else if(anglesOrFinalCut==2)
     {
         std::string outfilePath(argv[4]);
         maxcutGetOptimalAngles(graphFilePath, pVal,"tempAngles.txt");
         std::ifstream inAngles("tempAngles.txt");
         std::vector<double> gammasAndBetas;
+
+        /*TIP
+        Read in at most 2*pVal angles into gammaAndBetas.
+        */
         for(int i=0; i<2*pVal;i++)
         {
             double z;
@@ -303,17 +323,32 @@ int main(int argc, char *argv[]) {
         }
         inAngles.close();
         remove("tempAngles.txt");
+
+        /*TIP
+        ExtraData appears
+        */
         ExtraData e(pVal, graphFilePath.c_str());
+
+        /*TIP
+        Write the .qasm file.
+        */
         std::ofstream maxCutCircuitQasm("input/tempMaxCut.qasm");
         maxCutCircuitQasm << e.numQubits << std::endl;
         outputInitialPlusStateToFile(maxCutCircuitQasm, e.numQubits);
         applyU_CsThenU_Bs(e.pairs, pVal, gammasAndBetas, e.numQubits, maxCutCircuitQasm);
         maxCutCircuitQasm.close();
+
+        /*TIP
+        Preprocess (e.g. compute stochastic contraction sequence 100 times and choose the best). If success, continue to maxcutGetFinalString (e.g. finding the max cut). Else print/return failed.
+        */
         bool success(false);
         std::vector<std::pair<int, int>> optContract;
         success = preProcess("input/tempMaxCut.qasm", optContract, procSec);
         if (success)
         {
+            /*TIP
+            Hard-code in an optContract if we want to use another contraction sequence in the final cut simulation.
+            */
             maxcutGetFinalString(graphFilePath, pVal, optContract, gammasAndBetas,outfilePath);
         }
         else
@@ -326,4 +361,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-

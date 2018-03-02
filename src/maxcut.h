@@ -27,7 +27,9 @@ See the License for the specific language governing permissions and
 #include <sys/stat.h>
 
 
-
+/*
+WHAT DO I DO?
+*/
 struct ExtraData
 {
     ExtraData(const int p0, const char* filename0):fileName(filename0),p(p0){ReadInData();PopulateIterations();};
@@ -66,9 +68,9 @@ void ExtraData::ReadInData()
     int max =0;
     char temp;
     while(input>>temp)
-    {	
+    {
 	//std::cout << temp;
-	    
+
         if(temp == 'c') {
             // 'c' designates a comment
             std::getline(input,t);
@@ -231,4 +233,3 @@ void applyU_CsThenU_Bs(const std::vector<std::pair<int,int>>& objectiveF, const 
         }
     }
 }
-
