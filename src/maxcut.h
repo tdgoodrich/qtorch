@@ -27,7 +27,7 @@ See the License for the specific language governing permissions and
 #include <sys/stat.h>
 
 
-/*
+/*TIP
 WHAT DO I DO?
 */
 struct ExtraData
