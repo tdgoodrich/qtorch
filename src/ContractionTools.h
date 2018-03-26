@@ -50,7 +50,7 @@ The class ContractionTools is a wrapper class for a tensor network simulation of
 namespace qtorch {
 
     enum ContractionType {
-        Stochastic, FromEdges, CostContractSimple, CostContractBruteForce
+        Stochastic, FromEdges, CostContractSimple, CostContractBruteForce, QBB
     };
 
     class ContractionTools {
@@ -97,12 +97,16 @@ namespace qtorch {
         std::mt19937 mRandGen;
         bool mCopyCreated;
         int mNumThreadsInNetwork;
+        std::vector<std::shared_ptr<Wire> > GraphWires;
+        std::vector<std::array<std::shared_ptr<Wire>, 2>> LGEdges;
     protected:
         void CreateChunksOfNodes(std::shared_ptr<Network> &myNetwork);
 
         std::shared_ptr<Network> ParallelContract(std::mt19937 &randomGenerator);
 
         std::shared_ptr<Network> ContractFromEdges(std::mt19937 &randomGenerator);
+
+        std::shared_ptr<Network> TWContract();
 
         std::shared_ptr<Network> CostBasedContractionSimple(const int pValue);
 
@@ -143,14 +147,167 @@ namespace qtorch {
             return CostBasedContractionSimple(pValue);
         } else if (type == CostContractBruteForce) {
             return CostBasedContractionBruteForce(numSamples);
+        } else if (type == QBB) {
+            return TWContract();
         }
         return nullptr;
+    }
+
+    std::shared_ptr<Network> ContractionTools::TWContract() {
+        std::shared_ptr<Network> myNetwork;
+        if (!mCopyCreated) {
+            myNetwork = std::make_shared<Network>(mString, mMeasureFile);
+            myNetwork->SetNumThreads(mNumThreadsInNetwork);
+        } else {
+            myNetwork = mNetwork;
+        }
+        if (myNetwork->HasFailed()) //if you fail to open the network
+        {
+            return nullptr;
+        }
+
+        Linegraph lg(myNetwork);
+        lg.runQuickBB(inpvars.mapInt["quickbbseconds"],&tim,sixtyfourbit);
+        lg.LGContract();
+
+
+        return myNetwork;
+
+        /*
+        std::vector<std::pair<int, int>> wireOrdering;
+        std::vector<std::shared_ptr<Node>> CurrNodes = myNetwork->GetUncontractedNodes();
+        int numNodes = CurrNodes.size();
+
+        for (int nid = 0; nid < numNodes; nid++) {
+
+            // Loop over wires in this node
+            std::vector<std::shared_ptr<Wire>> WiresThisNode = CurrNodes[nid]->GetWires();
+
+            //staCntractGivenSequence(wireOrdering)aCntractGivenSequence(wireOrdering);::cout << "WiresThisNode.size(): " << WiresThisNode.size() << std::endl;
+
+            for (int wid = 0; wid < WiresThisNode.size(); wid++) {
+                std::shared_ptr<Wire> thisWire = WiresThisNode[wid];
+
+                //std::out <<
+
+
+                // Check if wire is already in the overall wire vector
+                if (std::find(GraphWires.begin(), GraphWires.end(), thisWire) == GraphWires.end()) {
+                    // Wire not already present
+
+                    // Add mWireID to the wire, which will be useful later.
+                    //std::cout << "GraphWires.size(): " << GraphWires.size() << std::endl;
+                    thisWire->SetWireID(GraphWires.size());
+
+                    // The vector does not contain the wire. So, insert it.
+                    GraphWires.push_back(thisWire);
+                }
+                for (int wid2 = 0; wid2 < wid; wid2++) {
+
+                    //LGEdges.push_back( {thisWire,WiresThisNode[wid2]} );
+                    LGEdges.push_back({WiresThisNode[wid2], thisWire});
+
+                }
+
+            }
+
+        }
+
+        // Nodes and edges of the LineGraph, NOT of the orig graph
+        int nLGNodes = this->GraphWires.size();
+        int nLGEdges = this->LGEdges.size();
+
+        // Output to CNF file
+        std::ofstream cnfFile("lg.cnf");
+        cnfFile << "p cnf " << nLGNodes << " " << nLGEdges << std::endl;
+        for (int id = 0; id < LGEdges.size(); id++) {
+            // PLUS 1 IS IMPORTANT, since quickbb is base-one indexing.
+            cnfFile << LGEdges[id][0]->GetWireID() + 1 << " ";
+            cnfFile << LGEdges[id][1]->GetWireID() + 1;
+
+            // '0' just means end of edge, in cnf format
+            cnfFile << " " << 0 << std::endl;
+        }
+        cnfFile.close();
+
+        std::ostringstream cmdss;
+        cmdss << "quickbb_64";
+        cmdss << " --min-fill-ordering --lb --time ";
+        cmdss << "60";
+        cmdss << " --outfile ";
+        cmdss << "out.qbb";
+        cmdss << " --statfile ";
+        cmdss << "qbb.stats";
+        cmdss << " --cnffile ";
+        cmdss << "lg.cnf";
+        system(cmdss.str().c_str());
+
+        std::ifstream fQbb("out.qbb");
+        if (!fQbb) {
+            std::cout << "Unable to open qbb file: "
+                      << "out.qbb" << std::endl;
+            throw QbbFailure();
+        }
+
+        std::vector<int> qbbOrder;
+
+        std::string line;
+        bool foundflag = false;
+        while (fQbb) {
+
+            std::getline(fQbb, line);
+
+            if (line == " The optimal ordering is ") {
+
+                // Read next line to get ordering
+                std::getline(fQbb, line);
+                std::stringstream ss(line);
+
+                for (int i = 0; i < this->GraphWires.size(); i++) {
+                    int wirenum;
+                    ss >> wirenum;
+                    qbbOrder.push_back(wirenum);
+                }
+                // Set flag
+                foundflag = true;
+                break;
+            }
+
+        }
+        // Contract in specified order
+        for (int i = 0; i < qbbOrder.size(); i++) {
+
+            // Note change to BASE-ZERO
+            std::shared_ptr<Wire> w = GraphWires[qbbOrder[i] - 1];
+
+            //std::cout << i << " ";
+
+            if (!w->IsContracted()) {
+                // Threshold deliberately set very large. qbb's ordering
+                // is what this function does, regardless of crashing.
+                int thresh = 100;
+                myNetwork->ContractNodes(w->GetNodeA().lock(), w->GetNodeB().lock(), thresh);
+
+
+                std::cout << "Contracting\n";
+            }
+
+        }
+
+
+        return myNetwork;
+        */
+
+
+
+
     }
 
 /*This method lets the user input a defined sequence of wires to contract. The wires are defined by a pair of the two corresponding node indices from the original graph.
  *the index of the node is defined by the order defined by the user in the qasm file. However, the first n indices are the initial states and the last n indices are the
  * projection measurements.
  */
+
     std::shared_ptr<Network>
     ContractionTools::ContractUserDefinedSequenceOfWires(const std::string &userInputFilePath) {
         std::shared_ptr<Network> myNetwork;
