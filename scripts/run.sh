@@ -23,11 +23,13 @@ if [ ! -z $ANGLE ]; then
   ANGLE=/angles/$ANGLE
 fi
 
-./maxcutQAOA $IN 1 $ACTION $ANGLE $OUT & pid=$!
+./maxcutQAOA $IN 1 $ACTION $ANGLE out.here & pid=$!
 
 ( timeout_monitor $pid ) & tmpid=$!
 
 wait $pid
+
+cp out.here $OUT
 
 kill $tmpid
 

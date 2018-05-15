@@ -2,7 +2,7 @@
 set -x
 FILENAME=""
 OUTPUT=""
-TIMEOUT="30m"
+TIMEOUT="10m"
 ACTION=0
 ANGLE=""
 
