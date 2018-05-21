@@ -90,16 +90,36 @@ int main(int argc, char *argv[]) {
     }
     int pVal = atoi(argv[2]);
     int action = atoi(argv[3]);
-    
+
     std::string graphFilePath(argv[1]);
     mkdir("output", 0755);
     mkdir("input", 0755);
     int procSec = 6000;
 
+    if(action == 1){
+        std::ifstream inAngles(argv[4]);
+        std::string outputQASM(argv[5]);
+
+        std::vector<double> gammasAndBetas;
+
+        for(int i=0; i < 2*pVal; i++){
+            double z;
+            inAngles>>z;
+            gammasAndBetas.push_back(z);
+        }
+        inAngles.close();
+        ExtraData e(pVal, graphFilePath.c_str());
+        std::ofstream maxCutCircuitQasm(outputQASM);
+        outputInitialPlusStateToFile( maxCutCircuitQasm, e.numQubits);
+        applyU_CsThenU_Bs(e.pairs, pVal, gammasAndBetas, e.numQubits, maxCutCircuitQasm);
+        maxCutCircuitQasm.close();
+
+    }
+
     if(action == 0){
         std::string outputPath(argv[4]);
         std::string outputQASM(argv[5]);
-        maxcutGetOptimalAngles(graphFilePath, pVal, outputPath); 
+        maxcutGetOptimalAngles(graphFilePath, pVal, outputPath);
         std::ifstream inAngles(outputPath);
         std::vector<double> gammasAndBetas;
 
