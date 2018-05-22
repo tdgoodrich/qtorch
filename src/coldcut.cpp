@@ -110,6 +110,7 @@ int main(int argc, char *argv[]) {
         inAngles.close();
         ExtraData e(pVal, graphFilePath.c_str());
         std::ofstream maxCutCircuitQasm(outputQASM);
+        maxCutCircuitQasm << e.numQubits << std::endl;
         outputInitialPlusStateToFile( maxCutCircuitQasm, e.numQubits);
         applyU_CsThenU_Bs(e.pairs, pVal, gammasAndBetas, e.numQubits, maxCutCircuitQasm);
         maxCutCircuitQasm.close();
