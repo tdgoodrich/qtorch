@@ -83,6 +83,98 @@ void maxcutGetOptimalAngles(std::string& graphFilePath, int p, const std::string
     }
 }
 
+void maxcutGetFinalStringUDS(std::string &graphFilePath, int p,std::string &contractionSequence,
+        std::vector<double>& gAndB, const std::string& outfilePath){
+    Timer z;
+    z.start();
+    ExtraData e(p,graphFilePath.c_str());
+    e.outputFile = outfilePath;
+
+    auto calculateFinalString = [&z, contractionSequence](const std::vector<double>& betas_gammas, ExtraData * f_data) {
+        srand(time(NULL));
+        std::vector<bool> answerString;
+        std::ofstream maxCutCircuitQasm;
+        std::ofstream maxCutAnswer(f_data->outputFile);
+        maxCutAnswer<<f_data->fileName<<std::endl;
+        double currentProb(1.0);
+
+        maxCutCircuitQasm.open("input/tempMaxCut.qasm");
+        maxCutCircuitQasm<<f_data->numQubits<<std::endl;
+        outputInitialPlusStateToFile(maxCutCircuitQasm,f_data->numQubits);
+        applyU_CsThenU_Bs(f_data->pairs,static_cast<ExtraData *>(f_data)->p,betas_gammas,f_data->numQubits,maxCutCircuitQasm);
+        maxCutCircuitQasm.close();
+
+        for(int i=0; i<f_data->numQubits; i++)
+        {
+            std::ofstream measurements("input/measureTest.txt");
+            for(int j=0; j<static_cast<ExtraData *>(f_data)->numQubits; j++)
+            {
+                if(j<answerString.size())
+                {
+                    if(answerString[j])
+                    {
+                        measurements <<"1 ";
+                    }
+                    else
+                    {
+                        measurements<<"0 ";
+                    }
+                }
+                else if(j==i)
+                {
+                    measurements<<"0 ";
+                }
+                else
+                {
+                    measurements<<"T ";
+                }
+            }
+            measurements.close();
+            ContractionTools p ("input/tempMaxCut.qasm","input/measureTest.txt");
+            p.ContractUserDefinedSequenceOfWires( contractionSequence);
+
+            double probNextGivenPrev(p.GetFinalVal().real()/currentProb);
+                if (probNextGivenPrev > 0.5)
+                {
+                    currentProb *= probNextGivenPrev;
+                    answerString.push_back(false);
+                }
+                else if (probNextGivenPrev < 0.5)
+                {
+                    currentProb *= (1.0-probNextGivenPrev);
+                    answerString.push_back(true);
+                }
+                else
+                {
+                    int r = rand() % 2;
+                    if (r == 1) {
+                        answerString.push_back(true);
+                    } else {
+                        answerString.push_back(false);
+                    }
+                    currentProb*=0.5;
+                }
+        }
+        int counter(0);
+        std::for_each(answerString.begin(),answerString.end(),[&maxCutAnswer](bool b){
+           maxCutAnswer<<b<<" ";
+        });
+
+        int cutEdgeCount(0);
+        std::for_each(f_data->pairs.begin(),f_data->pairs.end(),[&answerString,&cutEdgeCount,&f_data](std::pair<int,int> edge){
+            if(answerString[edge.first]!=answerString[edge.second])
+            {
+                cutEdgeCount++;
+            }
+        });
+        maxCutAnswer<<std::endl<<"Cut edges: "<<cutEdgeCount<<"/"<<f_data->numQubits*3/2<<std::endl;
+        maxCutAnswer<<"Time elapsed: "<<z.getElapsed()<<std::endl;
+        maxCutAnswer.close();
+    };
+
+    calculateFinalString(gAndB,&e);
+}
+
 int main(int argc, char *argv[]) {
     if(argc < 5){
         std::cout<<"Not enough arguments"<<std::endl;
@@ -95,6 +187,22 @@ int main(int argc, char *argv[]) {
     mkdir("output", 0755);
     mkdir("input", 0755);
     int procSec = 6000;
+
+    if(action == 2){
+        std::ifstream inAngles(argv[4]);
+        std::string outputFile(argv[5]);
+        std::string conseq(argv[6]);
+        std::vector<double> gammasAndBetas;
+
+        for(int i=0; i < 2*pVal; i++){
+            double z;
+            inAngles>>z;
+            gammasAndBetas.push_back(z);
+        }
+        inAngles.close();
+        maxcutGetFinalStringUDS(graphFilePath, pVal, conseq, gammasAndBetas, outputFile);
+
+    }
 
     if(action == 1){
         std::ifstream inAngles(argv[4]);
