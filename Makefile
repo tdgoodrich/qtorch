@@ -60,7 +60,7 @@ testdry:
 
 cut:
 	@printf "\n\n Compiling QAOA MaxCut - Note that nlopt-2.4.2 must be installed successfully to compile .....\n\n"
-	@g++ -g $(LFLAGS) $(SOURCE)maxcut.cpp -o $(BIN)maxcutQAOA $(INCLUDE) $(LMAXCUTFLAGS)
+	@g++ -g $(LFLAGS) $(SOURCE)coldcut.cpp -o $(BIN)maxcutQAOA $(INCLUDE) $(LMAXCUTFLAGS)
 	@mkdir -p input output
 	@cp $(BIN)maxcutQAOA $(HOME)/usr/local/bin
 	@chmod +x $(HOME)/usr/local/bin/maxcutQAOA
