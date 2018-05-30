@@ -33,6 +33,7 @@ namespace qtorch {
             totTimer = Timer();
             totTimer.start();
             ContractionTools p(fileName, "measureTest.txt");
+            p.ReduceAndPrintCircuitToTWGraph("output/twgraph.tw");
             std::shared_ptr<Network> temp = p.Contract(Stochastic);
             remove("measureTest.txt");
             newTime = totTimer.getElapsed();
